@@ -6,6 +6,7 @@
 #include "dirt.c"
 #include "samurai.c"
 #include "slash.c"
+#include "shuriken.c"
 
 #define START_POS_X     64
 #define START_POS_Y     64
@@ -19,6 +20,7 @@
 #define ANIM_DELAY       4
 #define ANIM_IDLE_START 13
 #define ANIM_FALL_START  3
+#define MAX_SHURIKEN     5
 
 const unsigned char samurai_tile_offsets[] = {
     1,0,
@@ -100,15 +102,24 @@ void player_anim_slash_cancel() {
     set_sprite_tile(6, 18);
 }
 
+void projectile_anim_spin(INT8 n, INT8 start, INT8 tick) {
+    for (INT8 i = 0; i < n; i++) {
+        set_sprite_tile(start + i, 19 + tick % 2);
+    }
+}
+
 // Initialize the player character and weapons
 void init_character() {
+    // Samurai -- Sprites 0 - 16
     set_sprite_data(0, 17, samurai);
+
+    // Slash -- Sprite 17, 18 (18 is blank)
     set_sprite_data(17, 2, slash);
 
     player_anim_idle(); // Set character tiles to idle animation
     
-    set_sprite_tile(5, 17);
-    set_sprite_tile(6, 17);
+    set_sprite_tile(5, 17); // slash top
+    set_sprite_tile(6, 17); // slash bottom
 }
 
 void move_character(INT8 x, INT8 y) {
@@ -156,6 +167,19 @@ void init_dirt() {
     set_bkg_tiles(0, 0, 20, 16, map_tiles);
 }
 
+// Initialize number (n) of projectiles on screen
+// Begins with sprite # (start)
+void init_projectiles(INT8 n, INT8 start) {
+    // Sprites 19, 20
+    set_sprite_data(19, 2, shuriken);
+
+    for (INT8 i = 0; i < n; i++) {
+        set_sprite_tile(start + i, 19);
+
+        move_sprite(start + i, 64 + (i*8), 64);
+    }
+}
+
 INT8 is_falling(INT8 y) {
     if (y < FLOOR_Y) {
         return 1;
@@ -193,12 +217,13 @@ void main() {
     INT8 d_y   = 0;
 
     // Animation
-    INT8 run_frame = -1; // Not running
-    INT8 tick      =  0;
-    INT8 anim_tick =  0; // Last animation tick
+    INT8 run_frame  = -1; // Not running
+    UINT8 tick      =  0;
+    UINT8 anim_tick =  0; // Last animation tick
 
     init_character();
     init_dirt();
+    init_projectiles(MAX_SHURIKEN, 7);
 
     SHOW_BKG; SHOW_SPRITES;
     
@@ -291,6 +316,8 @@ void main() {
             player_anim_idle();
         }
         
+        projectile_anim_spin(MAX_SHURIKEN, 7, tick / ANIM_DELAY);
+
         move_character(pos_x, pos_y);
 
         wait_vbl_done();
