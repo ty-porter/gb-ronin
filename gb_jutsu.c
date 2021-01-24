@@ -1,6 +1,7 @@
 #include <gb/gb.h>
 
 #include <stdio.h>
+#include <rand.h>
 #include <gb/console.h>
 
 #include "dirt.c"
@@ -12,6 +13,8 @@
 #define START_POS_Y     64
 #define WIN_X_RIGHT    152
 #define WIN_X_LEFT       8
+#define SHURIKEN_MIN_Y  20u
+#define SHURIKEN_MAX_Y  80u
 #define FLOOR_Y         80
 #define GRAVITY          1
 #define JUMP_VELOCITY   10
@@ -21,6 +24,7 @@
 #define ANIM_IDLE_START 13
 #define ANIM_FALL_START  3
 #define MAX_SHURIKEN     5
+#define SHURIKEN_VEL     2
 
 const unsigned char samurai_tile_offsets[] = {
     1,0,
@@ -167,16 +171,27 @@ void init_dirt() {
     set_bkg_tiles(0, 0, 20, 16, map_tiles);
 }
 
-// Initialize number (n) of projectiles on screen
+// Initialize projectiles on screen
 // Begins with sprite # (start)
-void init_projectiles(INT8 n, INT8 start) {
+// Needs props to init 
+void init_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
     // Sprites 19, 20
     set_sprite_data(19, 2, shuriken);
 
-    for (INT8 i = 0; i < n; i++) {
+    for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
         set_sprite_tile(start + i, 19);
 
-        move_sprite(start + i, 64 + (i*8), 64);
+        move_sprite(start + i, props[i][1], props[i][2]);
+    }
+}
+
+void move_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
+    for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
+        INT8 d_x = props[i][0] ? SHURIKEN_VEL : -SHURIKEN_VEL;
+
+        props[i][1] = props[i][1] + d_x;
+
+        move_sprite(start + i, props[i][1], props[i][2]);
     }
 }
 
@@ -201,6 +216,10 @@ INT8 debounced_input(INT8 target, INT8 new_key, INT8 old_key) {
     return new_press && !old_press;
 }
 
+UINT8 rand_uint_range(UINT8 min, UINT8 max) {
+    return (UINT8) (rand() % (max - min + 1)) + min;
+}
+
 void main() {
     BGP_REG = OBP0_REG = OBP1_REG = 0xE4;
 
@@ -213,17 +232,39 @@ void main() {
     // Movement
     UINT8 pos_x = START_POS_X;
     UINT8 pos_y = START_POS_Y;
-    INT8 d_x   = 0;
-    INT8 d_y   = 0;
+    INT8  d_x   = 0;
+    INT8  d_y   = 0;
 
     // Animation
-    INT8 run_frame  = -1; // Not running
+    INT8  run_frame = -1; // Not running
     UINT8 tick      =  0;
     UINT8 anim_tick =  0; // Last animation tick
+    UINT8 slashing  =  0; // Not slashing
+
+    /* Projectile data
+
+    2D array of size MAX_SHURIKEN x 3
+
+    Each row holds props about projectiles: { direction, x_pos, y_pos }
+    */
+    unsigned char projectile_props[MAX_SHURIKEN][3];
+
+    for (UINT8 i = 0; i < MAX_SHURIKEN; i++) {
+        if (rand() % 2) {
+            projectile_props[i][0] = 0x00; // Moving right
+            projectile_props[i][1] = WIN_X_LEFT;
+        }
+        else {
+            projectile_props[i][0] = 0x01; // Moving left
+            projectile_props[i][1] = WIN_X_RIGHT;
+        }
+
+        projectile_props[i][2] = rand_uint_range(SHURIKEN_MIN_Y, SHURIKEN_MAX_Y);
+    }
 
     init_character();
     init_dirt();
-    init_projectiles(MAX_SHURIKEN, 7);
+    init_projectiles(7, projectile_props);
 
     SHOW_BKG; SHOW_SPRITES;
     
@@ -300,9 +341,11 @@ void main() {
         // Slash
         if (debounced_input(J_B, key1, key2)) {
             player_anim_slash(pos_x, pos_y);
+            slashing = 1;
         }
         else {
             player_anim_slash_cancel();
+            slashing = 0;
         }
 
         // Handle animations now that everything is calculated...
@@ -317,6 +360,7 @@ void main() {
         }
         
         projectile_anim_spin(MAX_SHURIKEN, 7, tick / ANIM_DELAY);
+        move_projectiles(7, projectile_props);
 
         move_character(pos_x, pos_y);
 
