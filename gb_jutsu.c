@@ -1,14 +1,15 @@
 #include <gb/gb.h>
+#include <gb/console.h>
 
 #include <stdio.h>
 #include <rand.h>
-#include <gb/console.h>
 
 #include "dirt.c"
 #include "samurai.c"
 #include "slash.c"
 #include "shuriken.c"
 
+// Coordinates
 #define START_POS_X     64
 #define START_POS_Y     64
 #define WIN_X_RIGHT    152
@@ -16,15 +17,25 @@
 #define SHURIKEN_MIN_Y  20u
 #define SHURIKEN_MAX_Y  80u
 #define FLOOR_Y         80
+#define RAND_MAX        
+
+// Physics
 #define GRAVITY          1
 #define JUMP_VELOCITY   10
 #define MOVE_SPEED       2
+
+// Animation
 #define RUN_ANIM_LENGTH  4
 #define ANIM_DELAY       4
 #define ANIM_IDLE_START 13
 #define ANIM_FALL_START  3
+
+// Projectiles
 #define MAX_SHURIKEN     5
 #define SHURIKEN_VEL     2
+#define SHRKN_DIR     0x01 // Flag for shuriken direction (left is 0x01)
+#define SHRKN_MOVING  0x04 // Flag to determine if shuriken is moving
+#define SHRKN_CHANCE  0.5f // Chance to throw a new projectile
 
 const unsigned char samurai_tile_offsets[] = {
     1,0,
@@ -185,13 +196,48 @@ void init_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
     }
 }
 
+void init_new_projectile_props(INT8 nb, unsigned char props[MAX_SHURIKEN][3]) {
+    if (rand() % 2) {
+        props[nb][0] = props[nb][0] & ~SHRKN_DIR; // Moving right
+        props[nb][1] = 0;                         // Offscreen to left
+    }
+    else {
+        props[nb][0] = props[nb][0] | SHRKN_DIR;  // Moving left
+        props[nb][1] = 168;                       // Offscreen to right
+    }
+
+    props[nb][2] = (rand() % (SHURIKEN_MAX_Y - SHURIKEN_MIN_Y + 1)) + SHURIKEN_MIN_Y;
+
+    move_sprite(nb + 7, props[nb][1], props[nb][2]);
+}
+
 void move_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
     for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
-        INT8 d_x = props[i][0] ? SHURIKEN_VEL : -SHURIKEN_VEL;
+        // If not already moving
+        if (!(props[i][0] & SHRKN_MOVING)) {
+            // Check if it can start moving
+            if (((UINT8) rand()) / 255 > SHRKN_CHANCE) {
+                props[i][0] = props[i][0] | SHRKN_MOVING;
+            }
+        }
 
-        props[i][1] = props[i][1] + d_x;
+        // Else if moving
+        if (props[i][0] & SHRKN_MOVING) {
+            // If offscreen to the left
+            if (!(props[i][0] & SHRKN_DIR) && props[i][1] > 160) {
+                init_new_projectile_props(i, props);
+            }
+            else if (props[i][0] & SHRKN_DIR && props[i][1] < 4) {
+                init_new_projectile_props(i, props);
+            }
+            else {
+                INT8 d_x = (props[i][0] & SHRKN_DIR) ? -SHURIKEN_VEL : SHURIKEN_VEL;
 
-        move_sprite(start + i, props[i][1], props[i][2]);
+                props[i][1] = props[i][1] + d_x;
+
+                move_sprite(start + i, props[i][1], props[i][2]);
+            }
+        }
     }
 }
 
@@ -214,10 +260,6 @@ INT8 debounced_input(INT8 target, INT8 new_key, INT8 old_key) {
     old_press = old_key & target;
 
     return new_press && !old_press;
-}
-
-UINT8 rand_uint_range(UINT8 min, UINT8 max) {
-    return (UINT8) (rand() % (max - min + 1)) + min;
 }
 
 void main() {
@@ -250,16 +292,7 @@ void main() {
     unsigned char projectile_props[MAX_SHURIKEN][3];
 
     for (UINT8 i = 0; i < MAX_SHURIKEN; i++) {
-        if (rand() % 2) {
-            projectile_props[i][0] = 0x00; // Moving right
-            projectile_props[i][1] = WIN_X_LEFT;
-        }
-        else {
-            projectile_props[i][0] = 0x01; // Moving left
-            projectile_props[i][1] = WIN_X_RIGHT;
-        }
-
-        projectile_props[i][2] = rand_uint_range(SHURIKEN_MIN_Y, SHURIKEN_MAX_Y);
+        init_new_projectile_props(i, projectile_props);
     }
 
     init_character();
@@ -267,7 +300,7 @@ void main() {
     init_projectiles(7, projectile_props);
 
     SHOW_BKG; SHOW_SPRITES;
-    
+
     while(1) {
         // Check if falling
         if (is_falling(pos_y) == 1) {
