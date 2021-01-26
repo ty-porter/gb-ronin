@@ -17,18 +17,20 @@
 #define SHURIKEN_MIN_Y  20u
 #define SHURIKEN_MAX_Y  80u
 #define FLOOR_Y         80
-#define RAND_MAX        
 
 // Physics
 #define GRAVITY          1
 #define JUMP_VELOCITY   10
 #define MOVE_SPEED       2
+#define MAX_Y_SPEED      5
 
 // Animation
 #define RUN_ANIM_LENGTH  4
+#define SLSH_ANIM_LENGTH 4
 #define ANIM_DELAY       4
 #define ANIM_IDLE_START 13
 #define ANIM_FALL_START  3
+#define SLSH_ANIM_SPEED  2
 
 // Projectiles
 #define MAX_SHURIKEN     5
@@ -94,32 +96,68 @@ void player_anim_fall() {
     }
 }
 
-void player_anim_slash(INT8 pos_x, INT8 pos_y) {
-   INT8 offset_x;
+void player_anim_slash(INT8 pos_x, INT8 pos_y, INT8 frame_nb) {
+
+    /*
+        chr_offset_x: offset from player character (-16 or 16)
+        top_mod:      modifies x offset of top row (8 or 0)
+        bot_mod:      modifies x offset of bottom row (8 or 0)
+    */
+    INT8 chr_offset_x, top_mod, bot_mod;
 
     // Read the props from Sprite 1 (main character) to determine direction
-    offset_x = get_sprite_prop(1) & S_FLIPX ? -8 : 16;
+    if (get_sprite_prop(1) & S_FLIPX) {
+        // Facing left
+        chr_offset_x = -16;
+        top_mod = 8;
+        bot_mod = 0;
+    }
+    else {
+        // Facing right
+        chr_offset_x = 16;
+        top_mod = 0;
+        bot_mod = 8;
+    }
 
-    set_sprite_prop(5, get_sprite_prop(1) & S_FLIPX);
-    set_sprite_prop(6, get_sprite_prop(1) & S_FLIPX);
+    for (INT8 i = 0; i < 4; i++) {
+        set_sprite_prop(5 + i, get_sprite_prop(1) & S_FLIPX);
+    }
 
-    set_sprite_prop(6, get_sprite_prop(6) | S_FLIPY);
+    set_sprite_prop(7, get_sprite_prop(7) | S_FLIPY);
+    set_sprite_prop(8, get_sprite_prop(8) | S_FLIPY);
 
-    move_sprite(5, pos_x + offset_x, pos_y);
-    move_sprite(6, pos_x + offset_x, pos_y + 8);
+    move_sprite(5, pos_x + chr_offset_x + top_mod, pos_y);
+    move_sprite(6, pos_x + chr_offset_x + bot_mod, pos_y);
+    move_sprite(7, pos_x + chr_offset_x + top_mod, pos_y + 8);
+    move_sprite(8, pos_x + chr_offset_x + bot_mod, pos_y + 8);
+    
 
-    set_sprite_tile(5, 17);
-    set_sprite_tile(6, 17);
+    INT8 frame_offset = (frame_nb % 2) * 2;
+
+    if (frame_nb < 2) {
+        set_sprite_tile(5, 17 + frame_offset);
+        set_sprite_tile(6, 18 + frame_offset);
+
+        set_sprite_tile(7, 21); // blank
+        set_sprite_tile(8, 21); // blank
+    } else {
+        set_sprite_tile(7, 19 - frame_offset);
+        set_sprite_tile(8, 20 - frame_offset);
+
+        set_sprite_tile(5, 21); // blank
+        set_sprite_tile(6, 21); // blank
+    }
 }
 
 void player_anim_slash_cancel() {
-    set_sprite_tile(5, 18);
-    set_sprite_tile(6, 18);
+    for (INT8 i = 0; i < 4; i++) {
+        set_sprite_tile(5 + i, 21);
+    }
 }
 
 void projectile_anim_spin(INT8 n, INT8 start, INT8 tick) {
     for (INT8 i = 0; i < n; i++) {
-        set_sprite_tile(start + i, 19 + tick % 2);
+        set_sprite_tile(start + i, 22 + tick % 2);
     }
 }
 
@@ -128,13 +166,18 @@ void init_character() {
     // Samurai -- Sprites 0 - 16
     set_sprite_data(0, 17, samurai);
 
-    // Slash -- Sprite 17, 18 (18 is blank)
-    set_sprite_data(17, 2, slash);
+    // Slash -- Sprite 17 - 21 (21 is blank)
+    set_sprite_data(17, 5, slash);
 
     player_anim_idle(); // Set character tiles to idle animation
     
-    set_sprite_tile(5, 17); // slash top
-    set_sprite_tile(6, 17); // slash bottom
+    set_sprite_tile(5, 17); // slash top left
+    set_sprite_tile(6, 17); // slash top right
+    set_sprite_tile(7, 17); // slash bottom left
+    set_sprite_tile(8, 17); // slash bottom right
+
+    set_sprite_prop(7, get_sprite_prop(7) | S_FLIPY);
+    set_sprite_prop(8, get_sprite_prop(8) | S_FLIPY);
 }
 
 void move_character(INT8 x, INT8 y) {
@@ -186,11 +229,11 @@ void init_dirt() {
 // Begins with sprite # (start)
 // Needs props to init 
 void init_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
-    // Sprites 19, 20
-    set_sprite_data(19, 2, shuriken);
+    // Sprites 22, 23
+    set_sprite_data(22, 2, shuriken);
 
     for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
-        set_sprite_tile(start + i, 19);
+        set_sprite_tile(start + i, 22);
 
         move_sprite(start + i, props[i][1], props[i][2]);
     }
@@ -208,7 +251,7 @@ void init_new_projectile_props(INT8 nb, unsigned char props[MAX_SHURIKEN][3]) {
 
     props[nb][2] = (rand() % (SHURIKEN_MAX_Y - SHURIKEN_MIN_Y + 1)) + SHURIKEN_MIN_Y;
 
-    move_sprite(nb + 7, props[nb][1], props[nb][2]);
+    move_sprite(nb + 9, props[nb][1], props[nb][2]);
 }
 
 void move_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
@@ -250,6 +293,10 @@ INT8 is_falling(INT8 y) {
 }
 
 INT8 tick_gravity(INT8 d_y) {
+    if (d_y + GRAVITY > MAX_Y_SPEED) {
+        return MAX_Y_SPEED;
+    }
+
     return d_y + GRAVITY;
 }
 
@@ -278,10 +325,10 @@ void main() {
     INT8  d_y   = 0;
 
     // Animation
-    INT8  run_frame = -1; // Not running
-    UINT8 tick      =  0;
-    UINT8 anim_tick =  0; // Last animation tick
-    UINT8 slashing  =  0; // Not slashing
+    INT8  run_frame   = -1; // Not running
+    INT8  slash_frame = -1; // Not slashing
+    UINT8 tick        =  0;
+    UINT8 anim_tick   =  0; // Last animation tick
 
     /* Projectile data
 
@@ -297,7 +344,7 @@ void main() {
 
     init_character();
     init_dirt();
-    init_projectiles(7, projectile_props);
+    init_projectiles(9, projectile_props);
 
     SHOW_BKG; SHOW_SPRITES;
 
@@ -372,13 +419,11 @@ void main() {
         }
 
         // Slash
-        if (debounced_input(J_B, key1, key2)) {
-            player_anim_slash(pos_x, pos_y);
-            slashing = 1;
+        if (debounced_input(J_B, key1, key2) && slash_frame == -1) {
+            slash_frame = 0; // Start slash animation
         }
-        else {
-            player_anim_slash_cancel();
-            slashing = 0;
+        else if (slash_frame >= SLSH_ANIM_LENGTH) {
+            slash_frame = -1; // Stop the slash
         }
 
         // Handle animations now that everything is calculated...
@@ -391,9 +436,19 @@ void main() {
         else {
             player_anim_idle();
         }
+
+        if (slash_frame != -1) {
+            player_anim_slash(pos_x, pos_y, slash_frame);
+            if (tick % SLSH_ANIM_SPEED == 1) {
+                slash_frame += 1;
+            }
+        }
+        else {
+            player_anim_slash_cancel();
+        }
         
-        projectile_anim_spin(MAX_SHURIKEN, 7, tick / ANIM_DELAY);
-        move_projectiles(7, projectile_props);
+        projectile_anim_spin(MAX_SHURIKEN, 9, tick / ANIM_DELAY);
+        move_projectiles(9, projectile_props);
 
         move_character(pos_x, pos_y);
 
