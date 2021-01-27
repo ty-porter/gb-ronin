@@ -37,7 +37,13 @@
 #define SHURIKEN_VEL     2
 #define SHRKN_DIR     0x01 // Flag for shuriken direction (left is 0x01)
 #define SHRKN_MOVING  0x04 // Flag to determine if shuriken is moving
+#define SHRKN_SLSHED  0x08 // Flag for shurikens that have been slashed
 #define SHRKN_CHANCE  0.5f // Chance to throw a new projectile
+
+// Sprites
+#define SAMURAI          1 // to 4
+#define SLASH            5 // to 8
+#define SHURIKEN         9 // to MAX_SHURIKEN
 
 const unsigned char samurai_tile_offsets[] = {
     1,0,
@@ -155,10 +161,38 @@ void player_anim_slash_cancel() {
     }
 }
 
-void projectile_anim_spin(INT8 n, INT8 start, INT8 tick) {
-    for (INT8 i = 0; i < n; i++) {
-        set_sprite_tile(start + i, 22 + tick % 2);
+void projectile_anim_spin(INT8 tick) {
+    for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
+        set_sprite_tile(SHURIKEN + i, 22 + tick % 2);
     }
+}
+
+void play_sound_slash() {
+
+}
+
+INT8 slashed_projectile(INT8 x, INT8 y, unsigned char projectiles[MAX_SHURIKEN][3]) {
+    INT8 x_offset = (get_sprite_prop(1) & S_FLIPX) ? -16 : 16;
+    UINT8 y_offset = 4; // small allowance for hitbox
+    UINT8 slashed = 0;
+
+    for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
+        // If within slash width
+        if (projectiles[i][1] >= x + x_offset && projectiles[i][1] <= x + x_offset + 16) {
+            // If within slash height
+            if (projectiles[i][2] >= y - y_offset && projectiles[i][2] <= y + 16 + y_offset) {
+                // Not already slashed
+                if (!(projectiles[i][0] & SHRKN_SLSHED)) {
+                    slashed = 1;
+                }
+
+                // Set these to slashed even if they've already been slashed
+                projectiles[i][0] = projectiles[i][0] | SHRKN_SLSHED;
+            }
+        }
+    }
+
+    return slashed;
 }
 
 // Initialize the player character and weapons
@@ -228,18 +262,20 @@ void init_dirt() {
 // Initialize projectiles on screen
 // Begins with sprite # (start)
 // Needs props to init 
-void init_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
+void init_projectiles(unsigned char props[MAX_SHURIKEN][3]) {
     // Sprites 22, 23
     set_sprite_data(22, 2, shuriken);
 
     for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
-        set_sprite_tile(start + i, 22);
+        set_sprite_tile(SHURIKEN + i, 22);
 
-        move_sprite(start + i, props[i][1], props[i][2]);
+        move_sprite(SHURIKEN + i, props[i][1], props[i][2]);
     }
 }
 
 void init_new_projectile_props(INT8 nb, unsigned char props[MAX_SHURIKEN][3]) {
+    props[nb][0] = 0x00; // Reset everything
+
     if (rand() % 2) {
         props[nb][0] = props[nb][0] & ~SHRKN_DIR; // Moving right
         props[nb][1] = 0;                         // Offscreen to left
@@ -251,10 +287,10 @@ void init_new_projectile_props(INT8 nb, unsigned char props[MAX_SHURIKEN][3]) {
 
     props[nb][2] = (rand() % (SHURIKEN_MAX_Y - SHURIKEN_MIN_Y + 1)) + SHURIKEN_MIN_Y;
 
-    move_sprite(nb + 9, props[nb][1], props[nb][2]);
+    move_sprite(nb + SHURIKEN, props[nb][1], props[nb][2]);
 }
 
-void move_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
+void move_projectiles(unsigned char props[MAX_SHURIKEN][3]) {
     for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
         // If not already moving
         if (!(props[i][0] & SHRKN_MOVING)) {
@@ -278,7 +314,7 @@ void move_projectiles(INT8 start, unsigned char props[MAX_SHURIKEN][3]) {
 
                 props[i][1] = props[i][1] + d_x;
 
-                move_sprite(start + i, props[i][1], props[i][2]);
+                move_sprite(SHURIKEN + i, props[i][1], props[i][2]);
             }
         }
     }
@@ -344,7 +380,7 @@ void main() {
 
     init_character();
     init_dirt();
-    init_projectiles(9, projectile_props);
+    init_projectiles(projectile_props);
 
     SHOW_BKG; SHOW_SPRITES;
 
@@ -442,13 +478,25 @@ void main() {
             if (tick % SLSH_ANIM_SPEED == 1) {
                 slash_frame += 1;
             }
+
+            if (slashed_projectile(pos_x, pos_y, projectile_props) == 1) {
+                NR50_REG = 0x77;
+                NR51_REG = 0x11;
+                NR52_REG = 0x80;
+                
+                NR10_REG = 0x0F;
+                NR11_REG = 0xBF;
+                NR12_REG = 0x65;
+                NR13_REG = 0x6C;
+                NR14_REG = 0x87;
+            }
         }
         else {
             player_anim_slash_cancel();
         }
         
-        projectile_anim_spin(MAX_SHURIKEN, 9, tick / ANIM_DELAY);
-        move_projectiles(9, projectile_props);
+        projectile_anim_spin(tick / ANIM_DELAY);
+        move_projectiles(projectile_props);
 
         move_character(pos_x, pos_y);
 
