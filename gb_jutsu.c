@@ -173,7 +173,7 @@ void play_sound_slash() {
 
 INT8 slashed_projectile(INT8 x, INT8 y, unsigned char projectiles[MAX_SHURIKEN][3]) {
     INT8 x_offset = (get_sprite_prop(1) & S_FLIPX) ? -16 : 16;
-    UINT8 y_offset = 4; // small allowance for hitbox
+    UINT8 y_offset = 8; // small allowance for hitbox
     UINT8 slashed = 0;
 
     for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
@@ -188,6 +188,9 @@ INT8 slashed_projectile(INT8 x, INT8 y, unsigned char projectiles[MAX_SHURIKEN][
 
                 // Set these to slashed even if they've already been slashed
                 projectiles[i][0] = projectiles[i][0] | SHRKN_SLSHED;
+
+                // Set their move flag to false
+                projectiles[i][0] = projectiles[i][0] & ~SHRKN_MOVING;
             }
         }
     }
@@ -292,30 +295,45 @@ void init_new_projectile_props(INT8 nb, unsigned char props[MAX_SHURIKEN][3]) {
 
 void move_projectiles(unsigned char props[MAX_SHURIKEN][3]) {
     for (INT8 i = 0; i < MAX_SHURIKEN; i++) {
-        // If not already moving
-        if (!(props[i][0] & SHRKN_MOVING)) {
+        // If not already moving, and not falling
+        if (!(props[i][0] & SHRKN_MOVING) && !(props[i][0] & SHRKN_SLSHED)) {
             // Check if it can start moving
             if (((UINT8) rand()) / 255 > SHRKN_CHANCE) {
                 props[i][0] = props[i][0] | SHRKN_MOVING;
             }
         }
 
-        // Else if moving
-        if (props[i][0] & SHRKN_MOVING) {
-            // If offscreen to the left
-            if (!(props[i][0] & SHRKN_DIR) && props[i][1] > 160) {
-                init_new_projectile_props(i, props);
-            }
-            else if (props[i][0] & SHRKN_DIR && props[i][1] < 4) {
-                init_new_projectile_props(i, props);
-            }
-            else {
-                INT8 d_x = (props[i][0] & SHRKN_DIR) ? -SHURIKEN_VEL : SHURIKEN_VEL;
+        // Else if moving, but not slashed (falling)
+        if (props[i][0] & SHRKN_MOVING && !(props[i][0] & SHRKN_SLSHED)) {
+            INT8 d_x_mov = (props[i][0] & SHRKN_DIR) ? -SHURIKEN_VEL : SHURIKEN_VEL;
 
-                props[i][1] = props[i][1] + d_x;
+            props[i][1] = props[i][1] + d_x_mov;
 
-                move_sprite(SHURIKEN + i, props[i][1], props[i][2]);
-            }
+            move_sprite(SHURIKEN + i, props[i][1], props[i][2]);
+        }
+
+        // Else if slashed (falling)
+        if (props[i][0] & SHRKN_SLSHED) {
+            props[i][0] = props[i][0] & ~SHRKN_MOVING; // Explicitly make sure it's not moving, just in case
+
+            // Note, this is the negative of the normal movement divided by 2
+            INT8 d_x_fall = -( (props[i][0] & SHRKN_DIR) ? -SHURIKEN_VEL : SHURIKEN_VEL) / 2;
+
+            props[i][1] = props[i][1] + d_x_fall;
+            props[i][2] = props[i][2] + SHURIKEN_VEL;
+
+            move_sprite(SHURIKEN + i, props[i][1], props[i][2]);
+        }
+
+        // If offscreen, reinitialize
+        if (!(props[i][0] & SHRKN_DIR) && props[i][1] > 160) { // X right
+            init_new_projectile_props(i, props);
+        }
+        else if (props[i][0] & SHRKN_DIR && props[i][1] < 4) { // X left
+            init_new_projectile_props(i, props);
+        }
+        else if (props[i][2] > 144) { // Y, only need to check one because shurikens only fall
+            init_new_projectile_props(i, props);
         }
     }
 }
