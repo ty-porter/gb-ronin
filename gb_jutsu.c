@@ -167,8 +167,32 @@ void projectile_anim_spin(INT8 tick) {
     }
 }
 
-void play_sound_slash() {
+void play_sound_player_jump() {
+    NR41_REG = 0x04;
+    NR42_REG = 0x17;
+    NR43_REG = 0x51;
+    NR44_REG = 0xC0;
+}
 
+void play_sound_player_attack(INT8 frame_nb) {
+    NR41_REG = 0x01;
+    NR42_REG = 0x47;
+    NR43_REG = 0x11 + (0x10 * frame_nb);
+    NR44_REG = 0xC0;
+}
+
+void play_sound_projectile_slashed() {
+    NR10_REG = 0x0F;
+    NR11_REG = 0xBF;
+    NR12_REG = 0x65;
+    NR13_REG = 0x6C;
+    NR14_REG = 0x87;
+}
+
+void play_queued_sounds() {
+    NR50_REG = 0x77;
+    NR51_REG = 0xFF;
+    NR52_REG = 0x80;
 }
 
 INT8 slashed_projectile(INT8 x, INT8 y, unsigned char projectiles[MAX_SHURIKEN][3]) {
@@ -418,6 +442,7 @@ void main() {
         // Jump
         if (debounced_input(J_A, key1, key2) && d_y == 0) {
             d_y = -JUMP_VELOCITY;
+            play_sound_player_jump();
         }
 
         // Control the jump if button released
@@ -496,17 +521,10 @@ void main() {
             if (tick % SLSH_ANIM_SPEED == 1) {
                 slash_frame += 1;
             }
-
-            if (slashed_projectile(pos_x, pos_y, projectile_props) == 1) {
-                NR50_REG = 0x77;
-                NR51_REG = 0x11;
-                NR52_REG = 0x80;
-                
-                NR10_REG = 0x0F;
-                NR11_REG = 0xBF;
-                NR12_REG = 0x65;
-                NR13_REG = 0x6C;
-                NR14_REG = 0x87;
+            play_sound_player_attack(slash_frame);
+            
+            if (slashed_projectile(pos_x, pos_y, projectile_props) == 1) {             
+                play_sound_projectile_slashed();
             }
         }
         else {
@@ -524,5 +542,8 @@ void main() {
         if (anim_tick > tick) {
             anim_tick = tick - ANIM_DELAY; // Handle overflows for the game counter
         }
+
+        // Play the sounds!
+        play_queued_sounds();
     }
 }
