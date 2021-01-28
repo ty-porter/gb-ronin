@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <rand.h>
 
+#include "background.h"
+
 #include "dirt.c"
 #include "samurai.c"
 #include "slash.c"
@@ -16,7 +18,7 @@
 #define WIN_X_LEFT       8
 #define SHURIKEN_MIN_Y  20u
 #define SHURIKEN_MAX_Y  80u
-#define FLOOR_Y         80
+#define FLOOR_Y        100
 
 // Physics
 #define GRAVITY          1
@@ -281,9 +283,9 @@ void set_character_direction(INT8 d_x) {
     }
 }
 
-void init_dirt() {
-    set_bkg_data(0x0, 1, dirt_data);
-    set_bkg_tiles(0, 0, 20, 16, map_tiles);
+void init_background() {
+    set_bkg_data(0x0, background_tile_count, background_tile_data);
+    set_bkg_tiles(0, 0, background_tile_map_width, background_tile_map_height, background_map_data);
 }
 
 // Initialize projectiles on screen
@@ -420,8 +422,8 @@ void main() {
         init_new_projectile_props(i, projectile_props);
     }
 
+    init_background();
     init_character();
-    init_dirt();
     init_projectiles(projectile_props);
 
     SHOW_BKG; SHOW_SPRITES;
