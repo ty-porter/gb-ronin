@@ -6,10 +6,11 @@
 
 #include "background.h"
 
-#include "dirt.c"
 #include "samurai.c"
 #include "slash.c"
 #include "shuriken.c"
+
+#include "bgm.h"
 
 // Coordinates
 #define START_POS_X     64
@@ -410,6 +411,10 @@ void main() {
     UINT8 tick        =  0;
     UINT8 anim_tick   =  0; // Last animation tick
 
+    // Sound
+    INT8 bgm_counter  = 0;
+    INT8 current_beat = 0;
+
     /* Projectile data
 
     2D array of size MAX_SHURIKEN x 3
@@ -546,6 +551,16 @@ void main() {
         }
 
         // Play the sounds!
-        play_queued_sounds();
+        if (bgm_counter == 16) { //every 16 ticks is a beat
+            bgm_counter = 0;
+            current_beat = current_beat == 62 ? 0 : current_beat+1;
+            play_channel2(current_beat);
+            play_channel3(current_beat);
+            // play_channel4(current_beat);
+        }
+
+        bgm_counter++;
+
+        play_queued_sounds(); // Sound effects
     }
 }
