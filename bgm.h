@@ -23,15 +23,15 @@ const UWORD frequencies[] = { //values based on a formula used by the GB process
 //due to different registers used between ch1, 2, 3, 4
 typedef enum {
   NONE,
-  MELODY,  //channel 2
+  MELODY, //channel 2
   HARMONY //channel 3
 } instrument;
 
 // Define a note as having a pitch, instrument, and volume envelope
 typedef struct {
-	instrument i;
-	pitch p;
-	UBYTE env;
+  instrument i;
+  pitch p;
+  UBYTE env;
 } note;
 
 // Notes to be played on channel 2

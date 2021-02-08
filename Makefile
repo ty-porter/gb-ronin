@@ -1,6 +1,6 @@
 CC	= ../../../bin/lcc -Wa-l -Wl-m -Wl-j -Wm-ys
 
-BINS	= gb_jutsu.gb
+BINS	= gb_ronin.gb
 
 all:	$(BINS)
 

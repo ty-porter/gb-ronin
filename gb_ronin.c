@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include <rand.h>
 
+#include "ronin.h"
 #include "background.h"
 
+#include "cursor.c"
 #include "samurai.c"
 #include "slash.c"
 #include "shuriken.c"
@@ -48,31 +50,15 @@
 #define SLASH            5 // to 8
 #define SHURIKEN         9 // to MAX_SHURIKEN
 
+typedef enum {
+    TITLE,
+    GAME,
+    CREDITS
+} screen_t;
+
 const unsigned char samurai_tile_offsets[] = {
     1,0,
     2,3
-};
-
-const unsigned char map_tiles[] = {
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 };
 
 void player_anim_idle() {
@@ -225,6 +211,14 @@ INT8 slashed_projectile(INT8 x, INT8 y, unsigned char projectiles[MAX_SHURIKEN][
     return slashed;
 }
 
+void init_cursor() {
+    // Set the data
+    set_sprite_data(0, 1, cursor);
+
+    // Set the tile to the sprite
+    set_sprite_tile(0, 0);
+}
+
 // Initialize the player character and weapons
 void init_character() {
     // Samurai -- Sprites 0 - 16
@@ -287,6 +281,11 @@ void set_character_direction(INT8 d_x) {
 void init_background() {
     set_bkg_data(0x0, background_tile_count, background_tile_data);
     set_bkg_tiles(0, 0, background_tile_map_width, background_tile_map_height, background_map_data);
+}
+
+void init_title_background() {
+    set_bkg_data(0x0, ronin_tile_count, ronin_tile_data);
+    set_bkg_tiles(0, 0, ronin_tile_map_width, ronin_tile_map_height, ronin_map_data);
 }
 
 // Initialize projectiles on screen
@@ -390,7 +389,63 @@ INT8 debounced_input(INT8 target, INT8 new_key, INT8 old_key) {
     return new_press && !old_press;
 }
 
-void main() {
+screen_t title() {
+    BGP_REG = OBP0_REG = OBP1_REG = 0xE4;
+
+    SPRITES_8x8;
+
+    // Input
+    INT8 key1    = 0;
+    INT8 key2    = 0;
+    UINT8 cursor = 0;
+
+    screen_t next_screen = TITLE;
+
+    init_cursor();
+    init_title_background();
+
+    SHOW_BKG; SHOW_SPRITES;
+
+    while(1) {
+        // Read the keys
+        key2 = key1;
+        key1 = joypad();
+
+        if (cursor == 0) {
+            move_sprite(0, 50, 85); // Start
+        }
+        else {
+            move_sprite(0, 60, 105); // Credits
+        }
+
+        // Move the cursor
+        if (debounced_input(J_DOWN, key1, key2) && cursor != 1) {
+            cursor = 1;
+            move_sprite(0, 60, 110);
+        }
+
+        if (debounced_input(J_UP, key1, key2) && cursor != 0) {
+            cursor = 0;
+            move_sprite(0, 50, 85);
+        }
+
+        // Check selection when start is pressed
+        if (debounced_input(J_START, key1, key2)) {
+            // Move the cursor off the screen
+            move_sprite(0, 255, 255);
+
+            if (cursor == 0) {
+                // Here we go!
+                next_screen = GAME;
+                return next_screen;
+            }
+
+            // More cases to come later!
+        }
+    }
+}
+
+screen_t game() {
     BGP_REG = OBP0_REG = OBP1_REG = 0xE4;
 
     SPRITES_8x8;
@@ -562,5 +617,27 @@ void main() {
         bgm_counter++;
 
         play_queued_sounds(); // Sound effects
+    }
+}
+
+void main() {
+    BGP_REG = OBP0_REG = OBP1_REG = 0xE4;
+
+    SPRITES_8x8;
+
+    // Current screen, defaults to TITLE
+    screen_t current_screen = TITLE;
+
+    // Input
+    INT8 key1  = 0;
+    INT8 key2  = 0;
+
+    while(1) {
+        if (current_screen == TITLE) {
+            current_screen = title();
+        }
+        else if (current_screen == GAME) {
+            current_screen = game();
+        }
     }
 }
