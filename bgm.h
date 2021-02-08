@@ -23,7 +23,7 @@ const UWORD frequencies[] = { //values based on a formula used by the GB process
 //due to different registers used between ch1, 2, 3, 4
 typedef enum {
 	NONE,
-    MELODY,  //channel 2
+  MELODY,  //channel 2
 	HARMONY //channel 3
 } instrument;
 
@@ -185,15 +185,14 @@ void set_note(note *n) {
 			NR24_REG = 0x80 | ((UWORD)frequencies[(*n).p]>>8); //high bits of frequency (and sound reset)
 		break;
 		case HARMONY:
-            NR30_REG = 0x80;
-            NR31_REG = 0x00;
+      NR30_REG = 0x80;
+      NR31_REG = 0x00;
 			NR32_REG = 0x60;
 			NR33_REG = (UBYTE)frequencies[(*n).p]; //low bits of frequency
 			NR34_REG = 0x80 | ((UWORD)frequencies[(*n).p]>>8);
 		break;
-		break;
-        case NONE:
-        break;
+    case NONE:
+    break;
 	}
 }
 
@@ -204,5 +203,5 @@ void play_channel2(INT8 current_beat) {
 }
 
 void play_channel3(INT8 current_beat) {
-    set_note(&song_ch3[current_beat]);
+  set_note(&song_ch3[current_beat]);
 }
