@@ -22,9 +22,9 @@ const UWORD frequencies[] = { //values based on a formula used by the GB process
 //Instruments should be confined to one channel
 //due to different registers used between ch1, 2, 3, 4
 typedef enum {
-	NONE,
+  NONE,
   MELODY,  //channel 2
-	HARMONY //channel 3
+  HARMONY //channel 3
 } instrument;
 
 // Define a note as having a pitch, instrument, and volume envelope
@@ -36,10 +36,10 @@ typedef struct {
 
 // Notes to be played on channel 2
 note song_ch2[64] = { 
-	{MELODY, A5, 0x81U},
-	{MELODY, G5, 0x81U},
-	{MELODY, C6, 0x81U},
-	{MELODY, D6, 0x81U},
+  {MELODY, A5, 0x81U},
+  {MELODY, G5, 0x81U},
+  {MELODY, C6, 0x81U},
+  {MELODY, D6, 0x81U},
   {NONE, SILENCE, 0x00U},
   {NONE, SILENCE, 0x00U},
   {MELODY, A5, 0x81U},
@@ -106,10 +106,10 @@ note song_ch2[64] = {
 };
 
 note song_ch3[64] = { 
-	{HARMONY, A5, 0x81U},
-	{HARMONY, G5, 0x81U},
-	{HARMONY, C6, 0x81U},
-	{HARMONY, D6, 0x81U},
+  {HARMONY, A5, 0x81U},
+  {HARMONY, G5, 0x81U},
+  {HARMONY, C6, 0x81U},
+  {HARMONY, D6, 0x81U},
   {NONE, SILENCE, 0x00U},
   {NONE, SILENCE, 0x00U},
   {HARMONY, A5, 0x81U},
@@ -177,20 +177,20 @@ note song_ch3[64] = {
 
 //function to set sound registers based on notes chosen
 void set_note(note *n) {
-	switch((*n).i) {
-		case MELODY:
-			NR21_REG = 0x42;
-			NR22_REG = 0x75;
-			NR23_REG = (UBYTE)frequencies[(*n).p]; //low bits of frequency
-			NR24_REG = 0x80 | ((UWORD)frequencies[(*n).p]>>8); //high bits of frequency (and sound reset)
-		break;
-		case HARMONY:
+  switch((*n).i) {
+    case MELODY:
+      NR21_REG = 0x42;
+      NR22_REG = 0x75;
+      NR23_REG = (UBYTE)frequencies[(*n).p]; //low bits of frequency
+      NR24_REG = 0x80 | ((UWORD)frequencies[(*n).p]>>8); //high bits of frequency (and sound reset)
+    break;
+    case HARMONY:
       NR30_REG = 0x80;
       NR31_REG = 0x00;
-			NR32_REG = 0x60;
-			NR33_REG = (UBYTE)frequencies[(*n).p]; //low bits of frequency
-			NR34_REG = 0x80 | ((UWORD)frequencies[(*n).p]>>8);
-		break;
+      NR32_REG = 0x60;
+      NR33_REG = (UBYTE)frequencies[(*n).p]; //low bits of frequency
+      NR34_REG = 0x80 | ((UWORD)frequencies[(*n).p]>>8);
+    break;
     case NONE:
     break;
 	}
@@ -199,7 +199,7 @@ void set_note(note *n) {
 //This function plays whatever note is on
 //the current beat in the channel
 void play_channel2(INT8 current_beat) {
-	set_note(&song_ch2[current_beat]);
+  set_note(&song_ch2[current_beat]);
 }
 
 void play_channel3(INT8 current_beat) {
