@@ -6,6 +6,7 @@ Play as a mysterious samurai and slash the shurikens away from your pagoda!
 
 ## Screenshots
 
+![Title Screen](assets/bgb00002.bmp)
 ![Main Game](assets/bgb00001.bmp)
 
 ## Generate Your Own:
