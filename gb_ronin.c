@@ -1,5 +1,6 @@
 #include <gb/gb.h>
 #include <gb/console.h>
+#include <gb/font.h>
 
 #include <stdio.h>
 #include <rand.h>
@@ -59,6 +60,10 @@ typedef enum {
 const unsigned char samurai_tile_offsets[] = {
     1,0,
     2,3
+};
+
+const unsigned char fade_pallettes[] = {
+    0xFFU, 0xFEU, 0xF9U, 0xE4U,
 };
 
 void player_anim_idle() {
@@ -389,20 +394,37 @@ INT8 debounced_input(INT8 target, INT8 new_key, INT8 old_key) {
     return new_press && !old_press;
 }
 
+void load_credits_font() {
+    font_init();
+    font_t credits_font;
+    credits_font = font_load(font_ibm);
+    font_set(credits_font);
+}
+
 screen_t title() {
-    BGP_REG = OBP0_REG = OBP1_REG = 0xE4;
+    BGP_REG = fade_pallettes[0];
+    OBP0_REG = OBP1_REG = 0xE4;
 
     SPRITES_8x8;
 
     // Input
-    INT8 key1    = 0;
-    INT8 key2    = 0;
+    // Reading from joypad keeps held inputs from prev. screen from changing to next screen
+    INT8 key1    = joypad();
+    INT8 key2    = key1;
     UINT8 cursor = 0;
 
     screen_t next_screen = TITLE;
 
-    init_cursor();
     init_title_background();
+
+    // Fade in the title screen
+    // Hides the tile changes from credits
+    for (INT8 i = 0; i < 4; i++) {
+        BGP_REG = fade_pallettes[i];
+        delay(25);
+    }
+
+    init_cursor();
 
     SHOW_BKG; SHOW_SPRITES;
 
@@ -440,7 +462,79 @@ screen_t title() {
                 return next_screen;
             }
 
-            // More cases to come later!
+            if (cursor == 1) {
+                // Credits
+                next_screen = CREDITS;
+                return next_screen;
+            }
+        }
+    }
+}
+
+screen_t credits() {
+    BGP_REG = OBP0_REG = OBP1_REG = 0xE4;
+
+    SPRITES_8x8;
+
+    // Make sure the font tiles are initialized in GB mem
+    load_credits_font();
+
+    screen_t next_screen = TITLE;
+    
+    // Input
+    // Reading from joypad keeps held inputs from prev. screen from changing to next screen
+    INT8 key1 = joypad();
+    INT8 key2 = key1;
+
+    UINT8 pos_x = 76;
+    UINT8 pos_y = 140;
+
+    // Animation
+    INT8  run_frame = 0;
+    UINT8 tick      = 0;
+    UINT8 anim_tick = 0; // Last animation tick
+
+    init_character();
+    move_character(pos_x, pos_y);
+
+    SHOW_BKG; SHOW_SPRITES;
+
+        // "COPYRIGHT 2021 TYLER\n"
+    printf("      RONIN(c)      \n");
+    printf(" 2021  Tyler Porter \n");
+    printf("\n");
+    printf(" Distributed  under \n");
+    printf("    MIT  License    \n");
+    printf("\n\n"); 
+    printf("https://github.com/ \n");
+    printf("ty-porter/gb-ronin");
+
+    while(1) {
+        // Play the character run animation
+        
+        player_anim_run(run_frame);
+
+        // Read the keys
+        key2 = key1;
+        key1 = joypad();
+
+        if (debounced_input(J_START, key1, key2) ) {
+            move_character(255, 255); // offscreen
+            return next_screen;
+        }
+
+        if (tick - anim_tick >= ANIM_DELAY) {
+            run_frame += 1; // Set the running animation frame
+            anim_tick = tick;
+        }
+
+        if (run_frame >= RUN_ANIM_LENGTH) {
+            run_frame = 0;
+        }
+
+        tick += 1; // Increment tick counter
+        if (anim_tick > tick) {
+            anim_tick = tick - ANIM_DELAY; // Handle overflows for the game counter
         }
     }
 }
@@ -451,8 +545,8 @@ screen_t game() {
     SPRITES_8x8;
 
     // Input
-    INT8 key1  = 0;
-    INT8 key2  = 0;
+    INT8 key1 = 0;
+    INT8 key2 = 0;
 
     // Movement
     UINT8 pos_x = START_POS_X;
@@ -628,16 +722,15 @@ void main() {
     // Current screen, defaults to TITLE
     screen_t current_screen = TITLE;
 
-    // Input
-    INT8 key1  = 0;
-    INT8 key2  = 0;
-
     while(1) {
         if (current_screen == TITLE) {
             current_screen = title();
         }
         else if (current_screen == GAME) {
             current_screen = game();
+        }
+        else if (current_screen == CREDITS) {
+            current_screen = credits();
         }
     }
 }
